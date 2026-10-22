@@ -1,0 +1,126 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 5: APPLY STATIC MEMBERS AND THE OBJECT LIFE CYCLE
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To identify and implement class-level static variables and methods, explain the Java object life cycle and garbage collection mechanisms, demonstrate pass-by-value object reference semantics, and analyse architectural trade-offs between static and instance counters in multi-gate campus facilities.
+
+================================================================================
+2. STATIC MEMBERS AND ARCHITECTURAL JUSTIFICATION
+================================================================================
+
+A. Where Static Variables are Needed:
+------------------------------------
+In Java, instance variables belong to individual object instances on the heap, whereas `static` variables belong to the class blueprint itself and are stored in the JVM Metaspace/Heap class area.
+
+1. Global Ticket Counter (`static int ticketSequence`):
+   - Justification: Every parking ticket issued across the campus must possess a globally unique, strictly monotonic identifier.
+   - Why an instance variable would be fatally wrong: If `ticketSequence` were an instance variable of `ParkingTicket`, every time `new ParkingTicket()` is invoked, a fresh variable would be allocated with its default starting value (e.g., 1000). Every single vehicle entering the campus would receive ticket #1000, causing catastrophic ID collisions in database records, billing audits, and barrier sensors.
+   - By declaring `private static int ticketCounter = 1000;`, exactly one counter variable exists in JVM memory, shared by all ticket instances and incremented atomically: `this.ticketId = ++ticketCounter;`.
+
+2. Total Campus Occupancy (`static int totalOccupancy`):
+   - Justification: To display real-time parking availability on digital billboards at campus entry points, a single unified count of vehicles parked across all floors is required.
+
+B. Static Methods and Static Initialization Blocks:
+--------------------------------------------------
+1. Static Methods:
+   - Methods that operate solely on class-level data or perform stateless utility operations should be `static`.
+   - Examples:
+     * `ParkingTicket.getTotalTicketsIssued()`: Returns `ticketCounter - 1000` without requiring an instance.
+     * `ParkingFacility.isValidVehicleNumber(String plate)`: Pure validation function verifying plate regex format.
+2. Static Initialization Block (`static { ... }`):
+   - Executes exactly once when the class is first loaded into memory by the JVM ClassLoader, prior to any constructor invocation.
+   - Use Case: Loading campus parking tariff configuration, establishing baseline starting counters, or validating system clock consistency.
+
+================================================================================
+3. OBJECT LIFE CYCLE AND GARBAGE COLLECTION
+================================================================================
+In the Campus Smart-Parking System, objects transition through distinct life-cycle states:
+
+1. Creation & Allocation:
+   `ParkingTicket ticket = new ParkingTicket("TN01AB1111", 0, 1);`
+   - Memory is allocated on the Heap.
+   - Instance fields are initialized.
+   - The constructor executes.
+   - The heap address is assigned to the reference variable `ticket`.
+
+2. Active Utilization:
+   - While the vehicle remains parked, strong references to the object exist:
+     * Inside `ParkingFacility.slots[floor][slot]`
+     * Inside an active ticket registry `activeTickets.put(vehicleNo, ticket)`.
+
+3. De-referencing upon Vehicle Departure:
+   - When the vehicle departs, the barrier kiosk finalizes billing and releases the slot:
+     `slots[floor][slot] = null;`
+     `activeTickets.remove(vehicleNo);`
+     `ticket = null;`
+
+4. Garbage Collection Eligibility:
+   - As soon as the last strong reference to the object is severed, the object becomes "unreachable" via Root References (Stack frames, static references, JNI handles).
+   - The JVM Garbage Collector (e.g., G1, ZGC, or Parallel GC) detects unreachable objects during its Mark-and-Sweep cycle.
+   - Reclaiming: The memory occupied by the orphaned ticket object is reclaimed and added back to the free heap pool without manual deallocation (preventing C++ style memory leaks and dangling pointers).
+
+================================================================================
+4. OBJECT PASSING AND RETURN SEMANTICS IN JAVA
+================================================================================
+A fundamental principle of Java is: "Java is strictly pass-by-value."
+When an object is passed into a method:
+- The argument is NOT passed by reference in the C++ pointer-alias sense.
+- Rather, the *value of the reference address* is copied into the method's local parameter on the stack frame.
+
+Implications:
+1. Mutating State (Reflected in Caller):
+   Modifying an object's fields via the reference alters the object on the heap:
+   `void applyDiscount(ParkingTicket t) { t.setFee(0.0); }`
+   -> Caller sees the fee changed to ₹0.0 because both references point to the same heap object.
+2. Reassigning Reference (Not Reflected in Caller):
+   `void resetTicket(ParkingTicket t) { t = new ParkingTicket(); }`
+   -> Caller's original reference is completely unaffected because only the local stack copy was pointed to a new heap address.
+
+================================================================================
+5. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+================================================================================
+Scenario: Multi-Facility Campus with North and South Gates.
+
+Approach A: Single Global Static Counter (`static int globalTicketCounter`)
+- Design:
+  Declared in `ParkingTicket`. Both North Gate and South Gate parking facilities instantiate tickets that increment the same shared static variable.
+- Collision Behavior:
+  Zero collision risk. Tickets issued at North Gate and South Gate form a single continuous monotonic sequence:
+  North: Ticket #1001
+  South: Ticket #1002
+  North: Ticket #1003
+- Space Complexity:
+  O(1) extra space. Exactly 4 bytes allocated in Metaspace/Class memory regardless of how many facilities (k) or tickets (n) are created.
+- Scalability Trade-off:
+  In a multi-threaded or distributed environment, synchronization contention (`AtomicInteger`) may occur under extreme gate throughput.
+
+Approach B: Facility Instance Counter (`int localTicketCounter` per Facility)
+- Design:
+  Each `ParkingFacility` object (North Facility and South Facility) owns its own instance counter:
+  `class ParkingFacility { private int localTicketCounter = 1; ... }`
+- Collision Problem:
+  If North Facility issues ticket #1 and South Facility issues ticket #1, an ID collision occurs!
+- Proposed Solution:
+  Every facility must assign a composite ticket ID incorporating a unique Facility Prefix or Gate Identifier:
+  `Ticket ID = facility.getFacilityCode() + "-" + (++localTicketCounter)`
+  Example: "NORTH-1001", "SOUTH-1001".
+- Space Complexity:
+  Requires O(k) memory for k facility objects. For k facilities and n total tickets, space used by counters is k * 4 bytes = O(k).
+
+Comparison Table:
+--------------------------------------------------------------------------------
+Architecture            Ticket ID Format    Collision Risk  Space for k Facilities
+--------------------------------------------------------------------------------
+Static Global Counter   #1001, #1002        Zero (Monotonic)O(1) (Single counter)
+Facility Instance Count NORTH-1, SOUTH-1    Zero with PrefixO(k) (k counters)
+Instance in Ticket      #1, #1, #1          100% Collision  O(n) (Flawed)
+--------------------------------------------------------------------------------
+
+================================================================================
+6. EVIDENCE EXPECTED
+================================================================================
+Correctly justified use of `static` variables, methods, and blocks, a clear explanation of Java heap object lifecycle and GC eligibility, pass-by-value reference demonstrations, and multi-gate facility architectural analysis.

@@ -1,0 +1,228 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 6: DESIGN THE INHERITANCE HIERARCHY
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To design, implement, and evaluate an object-oriented inheritance hierarchy for campus vehicles and campus users, trace constructor execution order using `super`, construct UML class diagrams, and contrast inheritance with composition in terms of extensibility, execution time, and space overhead.
+
+================================================================================
+2. SUPERCLASSES, SUBCLASSES AND INHERITANCE TYPES
+================================================================================
+In the Campus Smart-Parking System, inheritance models real-world taxonomies where specialized entities share common baseline attributes and behaviors:
+
+A. Types of Inheritance Implemented:
+-----------------------------------
+1. Hierarchical Inheritance:
+   The abstract base class `Vehicle` is extended by multiple direct child classes:
+   - `TwoWheeler extends Vehicle`
+   - `Car extends Vehicle`
+2. Multilevel Inheritance:
+   The `Car` class is further extended by a specialized sub-category:
+   - `Vehicle` (Root) -> `Car` (Intermediate) -> `ElectricCar` (Leaf)
+   This forms a multi-tier specialization where `ElectricCar` inherits all traits of `Car` and `Vehicle`, while introducing electric drivetrain features.
+
+B. What is Inherited vs What is Added:
+-------------------------------------
+1. Base Class: `Vehicle`:
+   - Inherited by all: `regNo` (String), `brand` (String), `baseRatePerHour` (double).
+   - Common Methods: `getRegNo()`, `getBrand()`, `computeFee(long hours)`, `display()`.
+
+2. Subclass: `TwoWheeler`:
+   - Inherits: All Vehicle fields and methods.
+   - Adds: `hasHelmetStorage` (boolean).
+   - Specializes: Overrides `computeFee(long hours)` with two-wheeler tariff (₹10/hr).
+
+3. Subclass: `Car`:
+   - Inherits: All Vehicle fields and methods.
+   - Adds: `seatingCapacity` (int).
+   - Specializes: Overrides `computeFee(long hours)` with standard car tariff (₹20/hr).
+
+4. Subclass: `ElectricCar`:
+   - Inherits: All Vehicle and Car fields (`regNo`, `brand`, `baseRatePerHour`, `seatingCapacity`).
+   - Adds:
+     * `batteryCapacityKWh` (double)
+     * `isPluggedIn` (boolean)
+     * `chargingRatePerHour` (double = ₹15.0/hr)
+     * `requiresChargingSlot()`: Returns true.
+     * `plugIn()` / `unplug()`
+   - Specializes: Overrides `computeFee(long hours)` to aggregate base car parking fee + electric charging surcharge.
+
+================================================================================
+3. USE OF THE `super` KEYWORD
+================================================================================
+The `super` keyword in Java acts as a reference variable to the immediate parent class object.
+
+1. In Constructors (`super(...)`):
+   - Invokes the constructor of the immediate superclass.
+   - Mandatory rule: `super(...)` MUST be the very first syntactic statement in the child constructor.
+   - Example in `ElectricCar`:
+     `public ElectricCar(String regNo, String brand, int seatingCapacity, double batteryCapacity) {`
+     `    super(regNo, brand, seatingCapacity); // Delegates to Car constructor`
+     `    this.batteryCapacityKWh = batteryCapacity;`
+     `}`
+
+2. In Overridden Methods (`super.method()`):
+   - Prevents code duplication by calling the parent class implementation before appending subclass behavior.
+   - Example:
+     `@Override`
+     `public void display() {`
+     `    super.display(); // Prints regNo, brand, seatingCapacity`
+     `    System.out.println("Battery: " + batteryCapacityKWh + " kWh | PluggedIn: " + isPluggedIn);`
+     `}`
+
+================================================================================
+4. CONSTRUCTOR EXECUTION ORDER TRACE
+================================================================================
+When creating an instance of `ElectricCar`:
+   `ElectricCar ec = new ElectricCar("TN01EV2026", "Tata Nexon EV", 5, 40.5);`
+
+Execution Step-by-Step Trace:
+-----------------------------
+Step 1: `main` calls `new ElectricCar(...)`. JVM allocates raw heap memory for the combined fields of Object, Vehicle, Car, and ElectricCar.
+Step 2: `ElectricCar` constructor begins. Line 1 invokes `super("TN01EV2026", "Tata Nexon EV", 5)`.
+Step 3: `Car` constructor begins. Line 1 invokes `super("TN01EV2026", "Tata Nexon EV", 20.0)`.
+Step 4: `Vehicle` constructor begins. Line 1 invokes implicit `super()` (`java.lang.Object`).
+Step 5: `Object` constructor executes and completes.
+Step 6: Control returns to `Vehicle` constructor.
+        - `this.regNo = "TN01EV2026"` assigned.
+        - `this.brand = "Tata Nexon EV"` assigned.
+        - `this.baseRatePerHour = 20.0` assigned.
+        - Output printed: "[CONSTRUCTOR] Vehicle initialized."
+Step 7: Control returns to `Car` constructor.
+        - `this.seatingCapacity = 5` assigned.
+        - Output printed: "[CONSTRUCTOR] Car initialized."
+Step 8: Control returns to `ElectricCar` constructor.
+        - `this.batteryCapacityKWh = 40.5` assigned.
+        - `this.isPluggedIn = true` assigned.
+        - Output printed: "[CONSTRUCTOR] ElectricCar initialized."
+Step 9: Construction complete; reference returned to `ec`.
+
+Key takeaway: Constructors execute strictly in top-down hierarchical order from root superclass down to the leaf subclass.
+
+================================================================================
+5. UML CLASS DIAGRAM
+================================================================================
+
+Textual Hierarchy:
+                      +---------------------------------------+
+                      |               Vehicle                 |
+                      +---------------------------------------+
+                      | - regNo: String                       |
+                      | - brand: String                       |
+                      | - baseRatePerHour: double             |
+                      +---------------------------------------+
+                      | + computeFee(hours: long): double     |
+                      | + display(): void                     |
+                      +---------------------------------------+
+                                     ^         ^
+                                     |         |
+         +---------------------------+         +---------------------------+
+         |                                                                 |
++-----------------------------------+             +-----------------------------------+
+|            TwoWheeler             |             |                Car                |
++-----------------------------------+             +-----------------------------------+
+| - hasHelmetStorage: boolean       |             | - seatingCapacity: int            |
++-----------------------------------+             +-----------------------------------+
+| + computeFee(hours: long): double |             | + computeFee(hours: long): double |
+| + display(): void                 |             | + display(): void                 |
++-----------------------------------+             +-----------------------------------+
+                                                                   ^
+                                                                   |
+                                                  +-----------------------------------+
+                                                  |            ElectricCar            |
+                                                  +-----------------------------------+
+                                                  | - batteryCapacityKWh: double      |
+                                                  | - isPluggedIn: boolean            |
+                                                  | - chargingRatePerHour: double     |
+                                                  +-----------------------------------+
+                                                  | + computeFee(hours: long): double |
+                                                  | + plugIn(): void                  |
+                                                  | + display(): void                 |
+                                                  +-----------------------------------+
+
+Mermaid Diagram:
+```mermaid
+classDiagram
+    class Vehicle {
+        -String regNo
+        -String brand
+        -double baseRatePerHour
+        +computeFee(long hours) double
+        +display() void
+    }
+    class TwoWheeler {
+        -boolean hasHelmetStorage
+        +computeFee(long hours) double
+        +display() void
+    }
+    class Car {
+        -int seatingCapacity
+        +computeFee(long hours) double
+        +display() void
+    }
+    class ElectricCar {
+        -double batteryCapacityKWh
+        -boolean isPluggedIn
+        -double chargingRatePerHour
+        +computeFee(long hours) double
+        +plugIn() void
+        +display() void
+    }
+    Vehicle <|-- TwoWheeler : Hierarchical
+    Vehicle <|-- Car : Hierarchical
+    Car <|-- ElectricCar : Multilevel
+```
+
+================================================================================
+6. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS: INHERITANCE VS COMPOSITION
+================================================================================
+
+Alternative Model: Composition (Vehicle HAS-A VehicleType)
+Instead of subclassing (`Car is-a Vehicle`), a single `Vehicle` class holds a reference to a `VehicleType` object:
+   `class Vehicle {`
+   `    private String regNo;`
+   `    private VehicleType type; // Composition (has-a)`
+   `    public double computeFee(long hours) { return type.getRate() * hours; }`
+   `}`
+   `class VehicleType { private String name; private double rate; ... }`
+
+Comparison Analysis:
+
+1. Adding a New Vehicle Type:
+   - In Composition: Adding a new vehicle type is trivial for simple data variations. One simply instantiates a new `VehicleType("Bus", 40.0)`. No new Java class is written.
+   - Limitation of Composition: When behavior differs fundamentally (e.g., Electric Car needing battery tracking, charging states, and charging slot verification), pure composition either requires complex component delegation (Strategy / Decorator) or awkward conditionals inside the single `Vehicle` class.
+   - In Inheritance: Polymorphic classes (`ElectricCar`) cleanly encapsulate distinct state and specialized logic without polluting other vehicle representations.
+
+2. Time Complexity to Compute Fee:
+   - Inheritance: O(1) via JVM Virtual Method Table (vtable) dispatch (`v.computeFee(hours)`).
+   - Composition: O(1) via pointer dereferencing (`v.type.computeFee(hours)`).
+   - Both approaches have equivalent O(1) asymptotic execution speed.
+
+3. Space Complexity per Vehicle Object:
+   - Inheritance:
+     Each vehicle is a single, contiguous heap allocation containing the object header plus all fields of superclass and subclass.
+     Memory = Header (16 bytes) + RegNo ref (8 bytes) + Brand ref (8 bytes) + Rate (8 bytes) + Subclass fields (8-16 bytes) = ~48 bytes.
+   - Composition:
+     Requires TWO separate heap allocations:
+     (1) The `Vehicle` outer object (Header + RegNo + Type Ref = ~32 bytes).
+     (2) The `VehicleType` inner object (Header + Name + Rate = ~32 bytes).
+     Total Memory = 32 + 32 = 64 bytes (approx 33% higher heap memory per instance due to dual object headers and reference links).
+
+Summary Table:
+--------------------------------------------------------------------------------
+Criteria            Inheritance (Is-A)          Composition (Has-A)
+--------------------------------------------------------------------------------
+Conceptual Model    Taxonomy / Specialization   Assembly / Containment
+Work to add simple  Write new subclass          Instantiate new config object
+Behavioral nuance   Naturally polymorphic       Requires conditional/delegates
+Time to compute fee O(1) (Virtual call)         O(1) (Indirect reference)
+Heap space / object Compact single allocation   Higher (dual object allocations)
+--------------------------------------------------------------------------------
+
+================================================================================
+7. EVIDENCE EXPECTED
+================================================================================
+A justified inheritance model demonstrating hierarchical and multilevel relationships, a trace of constructor execution ordering with `super`, UML diagram, and asymptotic/memory comparisons against composition.

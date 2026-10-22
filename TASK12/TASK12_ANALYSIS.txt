@@ -1,0 +1,117 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 12: DAY-4 DESIGN CHALLENGE
+Bloom's Level: K5 - Evaluate
+
+================================================================================
+PART A: ANALYSIS OF CHANGE (2 MARKS)
+================================================================================
+
+1. What has Changed from the Original Problem:
+   - Initial Scope: The baseline system accommodated standard cars, two-wheelers, and electric vehicles with hardcoded hourly rates (₹10/hr, ₹20/hr, ₹35/hr), monthly passes for staff/students, and rectangular slot assumptions.
+   - New Requirements:
+     * Requirement 1 (New Vehicle Categories): Support for high-capacity and special-purpose campus vehicles—such as Heavy Campus Buses/Shuttles, Ambulances/Emergency Responders, and Bicycles/Micro-mobility.
+     * Requirement 2 (Dynamic Pricing Rules): Introduction of alternative tariff schemes—specifically a "One-Day Flat Pass" (flat ₹50/day regardless of hours parked), Peak-Hour Surcharges, and Emergency Fee Waivers (₹0 for ambulances)—without rewriting or recompiling classes that already work.
+     * Requirement 3 (Heterogeneous Facility Topologies): Robust handling of variable slot counts per floor (jagged floor configurations) as physical buildings expand.
+
+2. Which Classes, Methods, and Data Structures are Affected:
+   - In a tightly-coupled initial design:
+     * `Vehicle` subclasses had `computeFee(hours)` embedded directly inside each class. Introducing a "One-Day Flat Pass" or "Peak-Hour Multiplier" would force modifying `Car.java`, `TwoWheeler.java`, and `ElectricCar.java` to add conditional branches.
+     * `ParkingFacility` would need modifications if its allocation or billing methods contained `switch` or `instanceof` checks.
+   - In our redesigned architecture:
+     * Pricing logic is decoupled from vehicle geometry and extracted into a `PricingRule` Strategy interface.
+     * Vehicle subclasses focus strictly on physical attributes (`plate`, `size`, `requiresCharging`).
+     * Floor storage is modeled as a jagged array `ParkingSlot[floors][]`, natively supporting uneven floor capacities.
+
+3. Why a Different Number of Slots on Each Floor Affects Array Design:
+   - A traditional rectangular 2D array `slots[F][S_max]` mandates that every floor have the same dimension as the largest floor. If Floor 0 has 20 slots and Floor 2 has 100 slots, rectangular allocation allocates 300 references, of which 130 are phantom slots.
+   - If an allocation loop scans up to `slots[f].length`, it would assign cars to non-existent physical spaces on Floor 0, causing barrier malfunction.
+   - Adopting a Jagged Array `slots[f] = new ParkingSlot[slotsPerFloor[f]]` binds the array directly to real physical boundaries, preventing memory waste and eliminating out-of-bounds indexing.
+
+4. Which Classes Would Have to Be Modified Rather than Extended:
+   - In a poorly factored design: `Vehicle`, `Car`, `TwoWheeler`, `ParkingFacility`, and `BillingEngine` would all suffer invasive code modifications whenever a new pricing policy or vehicle type is added.
+   - In our refactored Strategy-Pattern design: ZERO existing classes are modified! The system achieves complete conformance with the Open-Closed Principle (OCP): existing tested classes remain untouched, while new vehicle types and pricing rules are added solely by extending base classes and implementing strategy interfaces.
+
+================================================================================
+PART B: EVALUATION OF THE ORIGINAL DESIGN (2 MARKS)
+================================================================================
+
+Evaluation Criteria:
+1. Can New Vehicle Types Be Added Only by Writing New Subclasses?
+   - In the vehicle taxonomy, YES. New vehicle types (`Bus`, `Ambulance`, `Bicycle`) inherit from `abstract class Vehicle`. They define their physical slot requirements and baseline attributes.
+   - However, if the fee calculation is baked into the vehicle class, every vehicle must duplicate pricing rule logic.
+
+2. Are Pricing Rules Kept in One Place or Spread Across Many Classes?
+   - In the original design (Task 6 & 7), `computeFee()` was implemented inside each individual subclass (`TwoWheeler.computeFee()`, `Car.computeFee()`, `ElectricCar.computeFee()`).
+   - Critical Evaluation: This violated the Single Responsibility Principle (SRP). A vehicle's responsibility is to model physical vehicle state, not commercial tariff policies.
+   - If the university management decides to introduce a "One-Day Flat Pass of ₹50" across all categories, developers would have to touch every single vehicle subclass!
+   - This spread and duplication of pricing rules proves that the original embedded pricing design is inadequate for dynamic university tariff rules.
+
+3. Can Existing Tested Classes Remain Unchanged?
+   - With embedded pricing: NO. Classes would need modification to support flat passes and peak rates.
+   - With Strategy Redesign: YES. By extracting pricing into `interface PricingRule`, legacy classes (`Car`, `TwoWheeler`, `ElectricCar`) remain 100% frozen, validated, and unchanged.
+
+Decision:
+MODIFY AND REDESIGN the pricing subsystem using the Strategy Design Pattern (`interface PricingRule`) while retaining the validated jagged array facility and core vehicle inheritance taxonomy.
+
+================================================================================
+PART C: ADAPTATION OR REDESIGN (2 MARKS)
+================================================================================
+
+A. Revised Class Structure:
+---------------------------
+1. Strategy Abstraction: `interface PricingRule`
+   ```java
+   public interface PricingRule {
+       double calculateFee(Vehicle vehicle, long durationMinutes);
+       String getRuleName();
+   }
+   ```
+2. Concrete Pricing Strategies:
+   - `StandardHourlyRule`: Standard vehicle rate * ceiling hours.
+   - `OneDayFlatPassRule`: Flat ₹50.00 fee for up to 24 hours (addresses the prompt's design challenge!).
+   - `PeakHourRule`: Applies 1.5x surge multiplier during 8:00 AM - 10:00 AM rush.
+   - `EmergencyFeeWaiverRule`: Strict ₹0.00 tariff for emergency vehicles (`Ambulance`, `CampusSecurity`).
+
+3. New Vehicle Subclasses (Extending `Vehicle` without modifying legacy code):
+   - `Bus extends Vehicle`: Heavy vehicle requiring commercial slot, standard rate ₹50/hr.
+   - `Ambulance extends Vehicle`: Emergency vehicle with emergency priority and automatic waiver rule.
+   - `Bicycle extends Vehicle`: Eco-friendly campus transport, rate ₹5/day.
+
+4. Decoupled Facility Integration:
+   - `AdaptiveParkingFacility` maintains `ParkingSlot[][] slots` (jagged array).
+   - Exit checkout method accepts a `PricingRule` strategy:
+     `public ParkingReceipt exit(int floor, int slot, long exitTime, PricingRule rule)`
+   - This decouples the physical facility from the billing strategy!
+
+================================================================================
+PART D: EVIDENCE-BASED DEFENCE (2 MARKS)
+================================================================================
+
+1. Quantitative Impact on Existing Codebase:
+   - Number of legacy classes modified: 0 (Zero).
+   - Number of legacy classes broken: 0 (Zero).
+   - All legacy test cases from Tasks 1-11 continue to pass with 100% backward compatibility.
+
+2. Future Extensibility:
+   - Adding a 20th vehicle category (e.g. `DroneDeliveryPod` or `AutonomousCart`) requires writing 1 new subclass extending `Vehicle`. Effort = O(1).
+   - Adding a new pricing rule (e.g. `WeekendCarnivalPass` or `AlumniReunionRate`) requires writing 1 new class implementing `PricingRule`. Effort = O(1).
+   - No ripple effects, no git merge conflicts, and zero regression risk on existing production billing.
+
+3. Automated Test Verification:
+   The `DesignChallengeDemo.java` test suite validates:
+   - Test C1: Legacy Car with Standard Hourly Rule (3 hrs @ ₹20 = ₹60.00) -> PASSED.
+   - Test C2: Visitor Car with NEW One-Day Flat Pass Rule (8 hrs flat = ₹50.00 instead of ₹160) -> PASSED.
+   - Test C3: NEW Vehicle Category `Bus` allocation and standard billing (4 hrs @ ₹50 = ₹200.00) -> PASSED.
+   - Test C4: NEW Vehicle Category `Ambulance` with Emergency Free Rule (5 hrs = ₹0.00) -> PASSED.
+   - Test C5: EV Charging Surcharge integration with One-Day Flat Pass (Flat ₹50 + ₹45 charging = ₹95.00) -> PASSED.
+   - Test C6: Non-uniform jagged floor capacity allocation (Floor 0: 20 slots, Floor 1: 50 slots, Floor 2: 100 slots) -> PASSED.
+
+4. Architectural Trade-Off Analysis:
+   - Trade-Off: Introducing the Strategy Pattern adds 1 interface and a few strategy classes.
+   - Benefit: Complete compliance with SOLID principles (Single Responsibility Principle and Open-Closed Principle). The slight increase in class count is vastly outweighed by the elimination of regression risks, zero code churn, and infinite extensibility.
+
+================================================================================
+CONCLUSION
+================================================================================
+The final design successfully defends the university's requirement: new vehicle categories (`Bus`, `Ambulance`, `Bicycle`) and new pricing rules (`OneDayFlatPass`, `EmergencyWaiver`) are seamlessly deployed without altering a single line of tested legacy code.

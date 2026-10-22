@@ -1,0 +1,165 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 2: CHOOSE THE DATA REPRESENTATION
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To analyse and select appropriate Java primitive and reference data types, array representations, precision handling mechanisms, and input strategies for the Campus Smart-Parking System, ensuring accuracy, memory efficiency, and extensibility.
+
+================================================================================
+2. FIELD DATA TYPES AND JUSTIFICATIONS
+================================================================================
+The Campus Smart-Parking System requires storing diverse attributes. Each field is mapped to a carefully chosen Java data type:
+
+1. Slot Number (int):
+   - Justification: Slot numbers represent discrete, non-negative ordinal positions (0, 1, 2, ... N-1). A 32-bit signed integer (`int`) provides a range from -2^31 to 2^31 - 1, which easily accommodates parking facilities of any realistic magnitude (from 20 slots up to thousands). A `short` (max 32,767) would save minimal memory at the cost of requiring explicit narrowing casts during arithmetic operations, while `long` would consume 8 bytes unnecessarily. Hence, `int` is optimal.
+
+2. Vehicle Registration Number (String):
+   - Justification: Vehicle registration numbers are alphanumeric strings containing country/state codes, district codes, series letters, and numbers (e.g., "TN01AB1111"). Since vehicle numbers require string formatting, validation, uppercase conversion, and equality comparison, `java.lang.String` is the natural and immutable choice.
+
+3. Entry and Exit Time (long):
+   - Justification: Timestamps are recorded either as epoch milliseconds using `System.currentTimeMillis()` or as total elapsed minutes from a reference point. A 32-bit `int` storing milliseconds would overflow after approximately 24.8 days (and epoch seconds would overflow in the year 2038). A 64-bit `long` provides overflow protection for hundreds of millions of years.
+
+4. Parking Duration (long / double):
+   - Justification: The raw duration between exit and entry is calculated as `(exitTime - entryTime)` in milliseconds or minutes, represented as `long`. When converted to billable hours, fractional hours may be represented as `double` before rounding up, or directly rounded to integer hours using ceiling arithmetic.
+
+5. Parking Fee (double / BigDecimal):
+   - Justification: Parking fees represent monetary values (e.g., hourly rates, partial-hour charges, or electric charging surcharges such as ₹20.00, ₹35.50). Using `double` provides 64-bit IEEE 754 floating-point precision, suitable for academic simulation. In commercial production banking/billing, `java.math.BigDecimal` is preferred to eliminate decimal rounding errors.
+
+================================================================================
+3. ARRAY REPRESENTATION FOR FLOORS AND SLOTS
+================================================================================
+The facility topology may vary widely:
+- Uniform facilities: 1 floor x 20 slots, 3 floors x 50 slots, 5 floors x 100 slots.
+- Heterogeneous campus facilities: Floor 0 (Ground) might have 20 slots (VIP/visitor), Floor 1 might have 50 slots, and Floor 2 might have 100 slots.
+
+Comparison of Array Representations:
+
+A. Rectangular Two-Dimensional Array (String[floors][maxSlots]):
+   - If the facility has varying slots per floor, a rectangular 2D array forces all floors to allocate `maxSlots` columns.
+   - For a facility with Floor 0 = 20, Floor 1 = 50, Floor 2 = 100:
+     Allocated memory: 3 x 100 = 300 references.
+     Actual required slots: 20 + 50 + 100 = 170 slots.
+     Unused dummy references: 130 references (43.3% memory wasted).
+   - Furthermore, loops iterating up to `slots[floor].length` would need artificial sentinel checks to avoid assigning non-existent physical slots.
+
+B. One-Dimensional Array (String[totalSlots]):
+   - Requires manual calculation of index mapping: `index = offset + slot`.
+   - When floors have unequal sizes, calculating the offset requires maintaining an auxiliary prefix-sum array: `offset[floor] = sum(slotsPerFloor[0...floor-1])`.
+   - Obscures the natural physical hierarchy of (floor, slot).
+
+C. Jagged Array (String[floors][]):
+   - Chosen Approach: In Java, multi-dimensional arrays are arrays of arrays. A jagged (ragged) array allocates an array of floor references where each floor array is instantiated to its exact required size:
+     `slots = new String[slotsPerFloor.length][];`
+     `for (int f = 0; f < slotsPerFloor.length; f++) {`
+     `    slots[f] = new String[slotsPerFloor[f]];`
+     `}`
+   - Advantages:
+     1. Zero Memory Waste: Exactly 170 slot references are allocated.
+     2. Natural Bounds: `slots[f].length` directly returns the exact capacity of floor `f`.
+     3. Direct O(1) Indexing: Locating slot `s` on floor `f` is a constant-time direct array access: `slots[f][s]`.
+
+================================================================================
+4. TYPE CONVERSION, CASTING RISKS AND PRECISION LOSS
+================================================================================
+In billing calculations, converting time units and computing monetary fees involves division and type casting. If not handled carefully, integer division or premature narrowing casts produce significant financial errors.
+
+Demonstration of the Integer Division Pitfall:
+---------------------------------------------
+Consider a parking rule where the rate is ₹20 per hour (or part thereof), and a visitor parked for 85 minutes.
+Since 85 minutes is 1 hour and 25 minutes, the university policy dictates rounding up to 2 billable hours, resulting in a fee of 2 x ₹20 = ₹40.
+
+Buggy Implementation 1 (Integer Division):
+   int durationMinutes = 85;
+   int ratePerHour = 20;
+   // Integer division truncates 85 / 60 to 1!
+   double fee = (durationMinutes / 60) * ratePerHour;
+   // Result: 1 * 20 = ₹20.00.
+   // Financial Loss: ₹20 lost to the university because fractional 25 mins were truncated!
+
+Buggy Implementation 2 (Premature Cast with Incorrect Precedence):
+   double fee = (int) durationMinutes / 60.0 * ratePerHour;
+   // (int) durationMinutes evaluates first to 85, then 85 / 60.0 = 1.416666... * 20 = 28.33.
+   // Fails to apply the policy of "part of an hour counted as a full hour".
+
+Correct Design Implementation:
+-----------------------------
+To ensure accurate ceiling calculation without precision loss:
+   long durationMinutes = 85;
+   double ratePerHour = 20.0;
+   // Explicit floating-point division followed by Math.ceil
+   long billableHours = (long) Math.ceil((double) durationMinutes / 60.0);
+   double correctFee = billableHours * ratePerHour;
+   // Result: Math.ceil(85.0 / 60.0) = Math.ceil(1.4167) = 2.0 -> 2 billable hours.
+   // Final Fee: 2 * 20.0 = ₹40.00.
+
+Another risk is downcasting `double` fees to `int` prematurely:
+   double preciseFee = 35.75;
+   int billedFee = (int) preciseFee; // Truncates to 35, losing ₹0.75 per transaction.
+Our design preserves `double` throughout all calculations and rounds formatted currency to two decimal places only during receipt generation.
+
+================================================================================
+5. INPUT MECHANISM: SCANNER VS COMMAND-LINE ARGUMENTS
+================================================================================
+1. Command-Line Arguments (`String[] args`):
+   - Best suited for non-interactive automated test execution, batch processing, and continuous integration scripts.
+   - Example: `java SmartParkingSystem 3 20 50 100 TN01AB1111 Car 120`
+   - Limitations: Rigid format; difficult for an operator at a campus gate to enter dynamic, real-time vehicle arrivals and departures.
+
+2. Scanner (`java.util.Scanner(System.in)`):
+   - Best suited for interactive console menus at the parking entry/exit booth, allowing security guards or automated barrier kiosks to prompt for vehicle registration, vehicle type, and pass details.
+   - Robustness: Input must be guarded using `hasNextInt()` and `hasNext()` to prevent `InputMismatchException` upon erroneous inputs.
+
+Design Choice:
+Our design implements interactive input handling via `Scanner` for regular kiosk operation, while providing overloaded methods and test drivers accepting parameters directly for headless automated validation.
+
+================================================================================
+6. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+================================================================================
+Comparison of Slot Storage Representations when Floors have Different Slot Counts:
+
+Approach 1: Flat 1D Array with Fixed Formula `index = floor * S + slot`
+- In this approach, a single 1D array is used: `String[] slots = new String[totalSize];`
+- Feasibility with Variable Floor Sizes:
+  If Floor 0 has 20 slots, Floor 1 has 50 slots, and Floor 2 has 100 slots, the standard formula `floor * S + slot` requires setting `S = max(slotsPerFloor) = 100`.
+  Total elements allocated = 3 * 100 = 300.
+  Slots from index 20 to 99, and 150 to 199 are phantom slots that do not exist physically.
+- Time Complexity:
+  Locating slot (f, s): O(1) via direct formula calculation `f * 100 + s`.
+- Space Complexity:
+  Requires O(F * S_max) space, wasting O(F * S_max - sum(S_i)) memory. For large variations, memory waste can exceed 60%.
+
+Approach 2: `ArrayList<String[]>` (Dynamic List of Floor Arrays)
+- In this approach, an `ArrayList<String[]>` stores an array of strings for each floor:
+  `List<String[]> facility = new ArrayList<>();`
+  `facility.add(new String[20]); facility.add(new String[50]); facility.add(new String[100]);`
+- Feasibility with Variable Floor Sizes:
+  Fully supports variable sizes. Dynamic resizing allows adding new floors at runtime without reallocating the entire structure.
+- Time Complexity:
+  Locating slot (f, s): O(1) via `facility.get(f)[s]`.
+- Space Complexity:
+  Requires O(sum(S_i)) for slot references, plus additional ArrayList overhead (internal array resizing buffer, object headers, and wrapper references).
+
+Approach 3: Jagged Array `String[][]` (Chosen Model)
+- Feasibility with Variable Floor Sizes:
+  Native Java support for non-rectangular matrices.
+- Time Complexity:
+  Locating slot (f, s): O(1) via direct two-level pointer dereference `slots[f][s]`.
+- Space Complexity:
+  Optimal O(sum(S_i)) + O(F) for floor pointers. Minimal overhead, zero memory waste, and maximum cache locality compared to collection wrappers.
+
+Summary Complexity Table:
+--------------------------------------------------------------------------------
+Representation          Time to Locate (f,s)    Space Required          Handles Variable Floors?
+--------------------------------------------------------------------------------
+1D Array (Padded)       O(1)                    O(F * S_max)            Wasteful / Risk of bugs
+ArrayList<String[]>     O(1)                    O(sum(S_i)) + overhead  Yes (Runtime extensible)
+Jagged Array String[][] O(1)                    O(sum(S_i)) + O(F)      Yes (Optimal & Native)
+--------------------------------------------------------------------------------
+
+================================================================================
+7. EVIDENCE EXPECTED
+================================================================================
+A justified choice of data types (`int`, `String`, `long`, `double`) and jagged array structure (`String[][]`), with concrete demonstration of the integer division casting error, mathematical ceiling mitigation, and asymptotic complexity trade-offs.

@@ -1,0 +1,102 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 11: IMPLEMENTATION, TESTING & DEFENCE
+Bloom's Level: K5 - Evaluate
+
+================================================================================
+1. AIM
+================================================================================
+To design, implement, test, and defend a complete, production-grade object-oriented Campus Smart-Parking System in Java, integrating multi-floor jagged facilities, vehicle classification, dedicated EV charging, monthly pass validation, automated ticket tracking, and a rigorous automated test suite evaluating system correctness and boundary resilience.
+
+================================================================================
+2. INTEGRATED SYSTEM ARCHITECTURE
+================================================================================
+The integrated system synthesizes all foundational object-oriented principles established in Tasks 1 through 10:
+
+Core Structural Components:
+1. `ParkingSlot`:
+   - Attributes: `floor`, `slotIndex`, `isChargingEquipped`, `occupiedVehicle`, `activeTicket`.
+   - Methods: `isCompatibleWith(Vehicle v)`, `park(Vehicle v, ParkingTicket t)`, `vacate()`.
+2. `Vehicle` Hierarchy:
+   - `abstract class Vehicle`: Roots identity (`plateNumber`), ownership (`ownerType`), and abstract requirements.
+   - `TwoWheeler`: Compact footprint, ₹10/hr tariff.
+   - `Car`: Standard parking, ₹20/hr tariff.
+   - `ElectricCar`: Inherits from `Car`, implements `Chargeable`. Distinguishes between standard EV parking and active charging bay requests (₹15/hr electricity surcharge).
+3. `CampusUser` and Pass Validation:
+   - Identifies user category: "STUDENT", "STAFF", "VISITOR".
+   - Business Rule: Students and staff presenting a valid monthly pass park at ₹0.00. Visitors pay standard tariffs.
+4. `ParkingTicket`:
+   - Generated with unique monotonic IDs from an atomic sequence counter.
+   - Captures arrival and departure timestamps.
+   - Stores itemized fee breakdown (base parking fee, charging surcharge, pass discount).
+5. `SmartParkingFacility`:
+   - Manages jagged array `ParkingSlot[floors][]`.
+   - Allocates the lowest-available compatible slot.
+   - Releases slots safely, returning itemized checkout receipts.
+
+================================================================================
+3. REQUIREMENTS TRACEABILITY MATRIX
+================================================================================
+--------------------------------------------------------------------------------
+Req ID  Scenario Requirement                Implemented Component & Method
+--------------------------------------------------------------------------------
+REQ-01  Multi-floor facility with variable  `SmartParkingFacility` using
+        numbered slots per floor            `ParkingSlot[floors][]` jagged array
+REQ-02  Two-wheeler, Car, and EV support    `TwoWheeler`, `Car`, `ElectricCar`
+REQ-03  EV dedicated charging bays billed   `ElectricCar.requiresCharging()` &
+        separately                          `ParkingSlot.isChargingEquipped()`
+REQ-04  Allocate suitable free slot on entry`SmartParkingFacility.enterFacility()`
+REQ-05  Issue unique ticket with entry time `ParkingTicket` with static counter
+REQ-06  Release slot on exit                `SmartParkingFacility.exitFacility()`
+REQ-07  Compute fee based on vehicle type   Subclass `computeHourlyRate()` and
+        and duration (rounded up)           `Math.ceil((exit - entry)/60.0)`
+REQ-08  Staff/Student monthly pass = ₹0 fee `CampusUser.hasValidMonthlyPass()` check
+REQ-09  Reject full facility gracefully     Returns `null` when no compatible slot
+REQ-10  Reject invalid/duplicate release    Boundary guards in `vacate()`
+--------------------------------------------------------------------------------
+
+================================================================================
+4. AUTOMATED TEST SUITE EXECUTION RESULTS
+================================================================================
+The automated test driver in `SmartParkingSystem.java` executes 8 comprehensive evaluation test cases:
+
+--------------------------------------------------------------------------------
+Test ID Test Scenario Description               Inputs / Preconditions          Expected Result         Status
+--------------------------------------------------------------------------------
+TC-01   Normal Allocation (Lowest Floor First)  Visitor Car, empty facility     Assigned Floor 0 Slot 0 PASS
+TC-02   EV Dedicated Charging Allocation        ElectricCar (charging=true)     Assigned Floor 0 Slot 1 PASS
+                                                                                (Charging bay)
+TC-03   Staff/Student Monthly Pass Zero-Fee     Student Car parked for 4 hours  Fee: ₹0.00 (Pass Valid) PASS
+TC-04   Visitor Hourly Billing with Rounding    Visitor TwoWheeler for 75 mins  Fee: ₹20.00 (2 hrs @ 10)PASS
+TC-05   Visitor EV with Charging Surcharge      Visitor EV parked for 3 hours   Fee: ₹105.00            PASS
+                                                with active charging            (3x20 park + 3x15 charge)
+TC-06   Full Facility Rejection (Edge Case)     Allocate when all slots taken   Returns NULL, No crash  PASS
+TC-07   Invalid & Duplicate Slot Release        Release out-of-bounds slot (9,0)Returns FALSE           PASS
+                                                Release already-empty slot      Returns FALSE           PASS
+TC-08   Immediate Re-allocation of Freed Slot   Free Floor 0 Slot 1, then park  Re-assigned to [0, 1]   PASS
+--------------------------------------------------------------------------------
+Overall Test Suite Result: 8/8 Tests Passed (100% Success Rate).
+
+================================================================================
+5. SYSTEM DEFENCE AND CRITICAL EVALUATION (BLOOM'S LEVEL: K5)
+================================================================================
+
+A. Architectural Soundness:
+- Loose Coupling & High Cohesion: Each entity is single-purposed. Vehicle pricing rules are encapsulated inside vehicle classes. Facility slots are decoupled from specific vehicle implementations through polymorphism.
+- Zero Modification for Future Vehicles: If a new vehicle type (e.g. `ElectricScooter` or `CampusShuttle`) is introduced, it extends `Vehicle` without modifying any existing lines in `SmartParkingFacility`.
+
+B. Robustness Against Real-World Edge Cases:
+1. Partial Hour Billing: The ceiling formula `Math.ceil(minutes / 60.0)` prevents university revenue loss from integer truncation.
+2. Slot Contamination Prevention: Electric vehicles needing charge are prohibited from occupying standard non-charging bays, and non-EVs are deprioritized from occupying charging bays.
+3. Tamper Resistance: All core ticket timestamps and IDs are declared `final`. Slot matrices are shielded behind private encapsulation.
+4. Concurrency Preparedness: Monotonic static ticket counter and thread-safe slot assignments can be synchronized or backed by atomic data structures for multi-barrier campus gates.
+
+C. Complexity Profile:
+- Allocation: O(F * S) worst-case linear search, O(1) best case.
+- Release: O(1) instant direct-indexed validation and release.
+- Space Complexity: O(sum(S_i)) physical slot allocations with zero jagged array overhead.
+
+================================================================================
+6. EVIDENCE EXPECTED
+================================================================================
+A complete, functioning, and self-contained Java implementation (`SmartParkingSystem.java`), accompanied by verifiable automated test evidence and an architectural defence justifying object-oriented design decisions.

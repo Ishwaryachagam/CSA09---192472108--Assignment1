@@ -1,0 +1,219 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 3: DESIGN THE CONTROL LOGIC
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To design, specify, and evaluate the decision, looping, and jump control logic for core operations of the Campus Smart-Parking System—specifically slot allocation, slot release, and fee computation—using SIMATS standard algorithmic pseudocode and Java implementation.
+
+================================================================================
+2. SEARCH AND CONTROL LOGIC ANALYSIS
+================================================================================
+The parking facility models physical floors and numbered slots using a jagged array `slots[floor][slot]`.
+
+A. Slot Search and Allocation Strategy:
+--------------------------------------
+1. Traversal Order:
+   - Ground floor / lowest floor first policy: Drivers are directed to the lowest floor with free capacity to minimize driving up ramps and optimize traffic flow.
+   - Nested Loop Traversal: Outer loop iterates through floors `f = 0` to `slots.length - 1`. Inner loop iterates through slots `s = 0` to `slots[f].length - 1`.
+2. Search Termination and Jump Optimization:
+   - The search checks `if (slots[f][s] == null)`.
+   - The instant a free slot is identified, the vehicle registration number is assigned: `slots[f][s] = vehicleNo`.
+   - A `return new int[]{f, s};` statement is executed immediately. This terminates both the inner and outer loops in a single step without needing boolean flags or redundant iterations.
+3. Exhaustion (Facility Full):
+   - If both loops run to completion without finding any `null` entry, the facility is completely full. The method exits the loops and returns `null`. The calling kiosk can immediately notify the driver or turn the barrier light red.
+
+B. Slot Release Validation Logic:
+---------------------------------
+Validation must guard against invalid arguments and stale operations before altering state:
+1. Floor Bounds Check: `floor < 0 || floor >= slots.length` -> return `false`.
+2. Slot Bounds Check: `slot < 0 || slot >= slots[floor].length` -> return `false`.
+3. Occupancy Check: `if (slots[floor][slot] == null)` -> slot is already free, return `false`.
+4. State Mutation: Set `slots[floor][slot] = null;` and return `true`.
+
+C. Fee Slabs and Decision Logic:
+--------------------------------
+The campus pricing policy applies progressive tiered fee slabs based on billable hours:
+- Staff/Student Pass Validation: If `hasMonthlyPass == true`, parking fee is ₹0.0 regardless of duration.
+- Tier 1 (Grace / Flat Base): Duration <= 1 hour -> Flat base rate (e.g., ₹20 for Car, ₹10 for Two-Wheeler).
+- Tier 2 (Standard Hourly): 1 < Duration <= 8 hours -> Base rate + (Hours - 1) * Hourly Rate.
+- Tier 3 (Daily Maximum Cap): Duration > 8 hours -> Capped at maximum daily rate (e.g., ₹150 for Car, ₹70 for Two-Wheeler) to prevent punitive charges for overnight or full-day campus visits.
+
+Control Structures Used:
+- `if - else if - else` chains are used for continuous ranges (duration boundaries).
+- `switch` statements are used for discrete categories (e.g., vehicle type selection: "TWO_WHEELER", "CAR", "ELECTRIC_CAR").
+- `break`: Breaks out of switch cases.
+- `return`: Short-circuits calculations once the applicable slab is evaluated.
+
+================================================================================
+3. ALGORITHMIC PSEUDOCODE (SIMATS ENGINEERING STANDARD)
+================================================================================
+
+--------------------------------------------------------------------------------
+ALGORITHM 1: AllocateFreeSlot
+--------------------------------------------------------------------------------
+INPUT:
+  slots : Jagged 2D array of String representing parking slots
+  vehicleNo : String representing the incoming vehicle's license plate
+OUTPUT:
+  An integer array [floor, slot] of the assigned slot, or NULL if facility is full
+
+BEGIN
+  FOR f <- 0 TO LENGTH(slots) - 1 DO
+    FOR s <- 0 TO LENGTH(slots[f]) - 1 DO
+      IF slots[f][s] IS NULL THEN
+        slots[f][s] <- vehicleNo
+        RETURN [f, s]
+      END IF
+    END FOR
+  END FOR
+  RETURN NULL
+END
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+ALGORITHM 2: ReleaseSlot
+--------------------------------------------------------------------------------
+INPUT:
+  slots : Jagged 2D array of String representing parking slots
+  floor : Integer index of floor to release
+  slot : Integer index of slot on the floor to release
+OUTPUT:
+  Boolean TRUE if slot freed successfully; FALSE otherwise
+
+BEGIN
+  // Step 1: Validate floor boundary
+  IF floor < 0 OR floor >= LENGTH(slots) THEN
+    RETURN FALSE
+  END IF
+
+  // Step 2: Validate slot boundary on the specified floor
+  IF slot < 0 OR slot >= LENGTH(slots[floor]) THEN
+    RETURN FALSE
+  END IF
+
+  // Step 3: Check if slot is already empty
+  IF slots[floor][slot] IS NULL THEN
+    RETURN FALSE
+  END IF
+
+  // Step 4: Free slot and acknowledge success
+  slots[floor][slot] <- NULL
+  RETURN TRUE
+END
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+ALGORITHM 3: CalculateParkingFee
+--------------------------------------------------------------------------------
+INPUT:
+  vehicleType : String ("TWO_WHEELER", "CAR", "ELECTRIC_CAR")
+  durationMinutes : Long integer of parked time
+  hasMonthlyPass : Boolean flag indicating valid staff/student pass
+  isChargingUsed : Boolean flag indicating EV plugged into charging station
+OUTPUT:
+  totalFee : Double representing final calculated fee
+
+BEGIN
+  // Rule 1: Monthly pass holders park free of charge
+  IF hasMonthlyPass IS TRUE THEN
+    RETURN 0.0
+  END IF
+
+  // Rule 2: Calculate billable hours rounded up
+  billableHours <- CEIL(durationMinutes / 60.0)
+
+  // Rule 3: Determine base rates and daily caps
+  SWITCH vehicleType DO
+    CASE "TWO_WHEELER":
+      hourlyRate <- 10.0
+      dailyCap <- 70.0
+    CASE "CAR":
+      hourlyRate <- 20.0
+      dailyCap <- 150.0
+    CASE "ELECTRIC_CAR":
+      hourlyRate <- 20.0
+      dailyCap <- 150.0
+    DEFAULT:
+      hourlyRate <- 20.0
+      dailyCap <- 150.0
+  END SWITCH
+
+  // Rule 4: Compute slab fee
+  IF billableHours <= 1 THEN
+    baseFee <- hourlyRate
+  ELSE IF billableHours <= 8 THEN
+    baseFee <- hourlyRate + (billableHours - 1) * hourlyRate
+  ELSE
+    baseFee <- dailyCap
+  END IF
+
+  // Rule 5: Add EV charging surcharge if applicable
+  totalFee <- baseFee
+  IF vehicleType = "ELECTRIC_CAR" AND isChargingUsed IS TRUE THEN
+    chargingRatePerHour <- 15.0
+    totalFee <- totalFee + (billableHours * chargingRatePerHour)
+  END IF
+
+  RETURN totalFee
+END
+--------------------------------------------------------------------------------
+
+================================================================================
+4. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+================================================================================
+
+Approach A: Linear Grid Search (Current Implementation)
+- Logic:
+  Allocation systematically scans floors 0 to F-1 and slots 0 to S-1.
+- Allocation Time Complexity:
+  Best Case: O(1) when slot (0, 0) is empty.
+  Worst Case: O(F * S) or O(sum(S_i)) when the facility is nearly full or completely full.
+- Release Time Complexity:
+  O(1) direct array index verification and null assignment.
+- Auxiliary Space Complexity:
+  O(1) extra space because state is tracked directly inside the primary grid.
+
+Approach B: Free-Slot Stack per Floor + Free Count Array
+- Logic:
+  Maintain `int[] freeCount` of size F, and `Stack<Integer>[] freeSlots` where `freeSlots[f]` stores the indices of currently free slots on floor `f`.
+  - Allocation:
+    1. Iterate floor `f` from 0 to F-1.
+    2. Check `if (freeCount[f] > 0)`:
+       Pop slot index `s = freeSlots[f].pop();`
+       Decrement `freeCount[f]--;`
+       `slots[f][s] = vehicleNo;`
+       Return `[f, s]`.
+    3. If all floors have `freeCount[f] == 0`, facility is full; return `null`.
+  - Release:
+    1. Validate `floor` and `slot` bounds and occupancy.
+    2. `slots[floor][slot] = null;`
+    3. `freeSlots[floor].push(slot);`
+    4. `freeCount[floor]++;`
+    5. Return `true`.
+- Time Complexity:
+  - Allocation: O(F) to find the first floor with available capacity, and O(1) to pop the slot. If a pointer `lowestAvailableFloor` is maintained, allocation runs in O(1) amortized time!
+  - Release: O(1) push and counter increment.
+- Auxiliary Space Complexity:
+  Requires an array of stacks containing indices for all available slots: O(F * S) additional memory pointers.
+
+Comparison Table:
+--------------------------------------------------------------------------------
+Metric              Linear Grid Scan (Approach A)   Free-Slot Stacks (Approach B)
+--------------------------------------------------------------------------------
+Allocate Best Time  O(1)                            O(1)
+Allocate Worst Time O(F * S)                        O(F) or O(1) with pointer
+Release Time        O(1)                            O(1)
+Auxiliary Space     O(1) (Minimal footprint)        O(F * S) (Higher memory)
+Implementation      Simple, robust, no sync bugs    Requires maintaining 2 structures
+--------------------------------------------------------------------------------
+
+Recommendation:
+For small to medium university parking facilities (up to thousands of slots), Linear Grid Scan is optimal due to zero auxiliary memory overhead and cache-friendly contiguous array scanning. For massive multi-terminal airport facilities (100,000+ slots), the Stack/Queue approach with O(1) allocation is preferred.
+
+================================================================================
+5. EVIDENCE EXPECTED
+================================================================================
+Full pseudocode adhering to SIMATS standards, complete implementation of `ParkingFacility.java` reproducing the exact specified test harness output, and rigorous complexity comparison between iterative scanning and stack-based allocation.

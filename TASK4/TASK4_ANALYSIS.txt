@@ -1,0 +1,198 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 4: DESIGN CLASSES, OBJECTS AND CONSTRUCTORS
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To design the core classes of the Campus Smart-Parking System, specify their fields and methods, implement default, parameterized, overloaded, and copy constructors using constructor chaining with the `this` keyword, and analyse memory layout across the Java Stack and Heap.
+
+================================================================================
+2. CLASS DESIGN: FIELDS AND METHODS
+================================================================================
+The domain model requires three foundational classes:
+
+1. Class `Vehicle`:
+   - Purpose: Encapsulates the state of any vehicle entering the university campus.
+   - Fields:
+     * `regNo` (String): Unique registration plate number.
+     * `type` (String): Vehicle category ("TwoWheeler", "Car", "ElectricCar").
+     * `ownerCategory` (String): "Student", "Staff", or "Visitor".
+   - Methods:
+     * `getRegNo()`: Returns vehicle registration number.
+     * `getType()`: Returns vehicle type.
+     * `display()`: Prints formatted vehicle summary.
+
+2. Class `ParkingSlot`:
+   - Purpose: Represents a physical parking stall within the multi-level facility.
+   - Fields:
+     * `floor` (int): Floor index (0 to F-1).
+     * `slotNumber` (int): Slot index within the floor (0 to S-1).
+     * `isChargingSlot` (boolean): True if equipped with EV charging station.
+     * `isOccupied` (boolean): Occupancy status.
+     * `vehicle` (Vehicle): Reference to the vehicle currently parked, or null.
+   - Methods:
+     * `assignVehicle(Vehicle v)`: Parks vehicle and marks slot occupied.
+     * `vacate()`: Frees slot, clears vehicle reference.
+     * `isAvailable()`: Returns true if slot is not occupied.
+
+3. Class `ParkingTicket`:
+   - Purpose: Serves as legal proof of entry, tracking time, slot, and billing.
+   - Fields:
+     * `ticketId` (int): Unique monotonic ticket number.
+     * `vehicleNo` (String): Associated license plate.
+     * `floor` (int): Floor where vehicle is parked.
+     * `slot` (int): Slot number allocated.
+     * `entryTime` (long): Timestamp of arrival in epoch milliseconds.
+     * `exitTime` (long): Timestamp of departure.
+     * `fee` (double): Calculated parking fee.
+     * `isPaid` (boolean): Payment status.
+   - Methods:
+     * `markExit(long exitTime, double fee)`: Finalizes ticket upon departure.
+     * `getDurationMinutes()`: Computes elapsed parking duration.
+     * `displayTicket()`: Prints complete ticket details.
+
+================================================================================
+3. CONSTRUCTOR VARIETIES AND CONSTRUCTOR CHAINING
+================================================================================
+
+A. Types of Constructors Used:
+------------------------------
+1. Default Constructor (No-Arg):
+   - Initializes fields to safe defaults (e.g., `ParkingSlot()` defaults to floor 0, slot 0, non-charging, unoccupied).
+2. Parameterized Constructor:
+   - Accepts all essential state attributes upon instantiation, ensuring an object is fully initialized from creation (e.g., `ParkingTicket(ticketId, vehicleNo, floor, slot, entryTime)`).
+3. Overloaded Constructors:
+   - Provides multiple initialization routes. For example, a ticket can be created by supplying an explicit entry timestamp, or by supplying only the vehicle and slot coordinates where entry timestamp defaults to current system time.
+
+B. The `this` Keyword and Constructor Chaining:
+---------------------------------------------
+- Eliminating Ambiguity:
+  `this.vehicleNo = vehicleNo;` resolves variable shadowing between constructor arguments and instance fields.
+- Constructor Chaining via `this(...)`:
+  To prevent duplicate initialization code across overloaded constructors, secondary constructors delegate directly to the canonical parameterized constructor using `this(...)`:
+
+  // Auxiliary overloaded constructor
+  public ParkingTicket(int ticketId, String vehicleNo, int floor, int slot) {
+      this(ticketId, vehicleNo, floor, slot, System.currentTimeMillis()); // Chained call!
+  }
+
+  // Canonical parameterized constructor
+  public ParkingTicket(int ticketId, String vehicleNo, int floor, int slot, long entryTime) {
+      this.ticketId = ticketId;
+      this.vehicleNo = vehicleNo;
+      this.floor = floor;
+      this.slot = slot;
+      this.entryTime = entryTime;
+      this.exitTime = 0;
+      this.fee = 0.0;
+      this.isPaid = false;
+  }
+
+Benefits:
+1. DRY Principle: Field assignments, default states, and precondition checks reside in exactly one constructor.
+2. Single Point of Maintenance: Any changes to default field policies require updating only one location.
+
+================================================================================
+4. COPY CONSTRUCTORS AND DUPLICATE TICKET ISSUANCE
+================================================================================
+A Copy Constructor creates a new object as an exact duplicate of an existing object:
+
+  public ParkingTicket(ParkingTicket original) {
+      this.ticketId = original.ticketId;
+      this.vehicleNo = original.vehicleNo;
+      this.floor = original.floor;
+      this.slot = original.slot;
+      this.entryTime = original.entryTime;
+      this.exitTime = original.exitTime;
+      this.fee = original.fee;
+      this.isPaid = original.isPaid;
+  }
+
+Why Needed in Campus Smart-Parking:
+1. Re-issuing Duplicate Tickets: If a student or visitor loses their physical barcode/slip or requests an exit receipt while the gate kiosk keeps the original in its audit log, creating an independent duplicate prevents mutational side effects.
+2. Audit Trails & Defense against Tampering: Retains an immutable snapshot of ticket state at exit time, safeguarding financial integrity against subsequent modification.
+
+================================================================================
+5. MEMORY ARCHITECTURE: STACK AND HEAP STORAGE
+================================================================================
+When Java executes `ParkingTicket t1 = new ParkingTicket(101, "TN01AB1111", 0, 1);`:
+
+1. Java Stack (Thread Frame):
+   - The reference variable `t1` is allocated in the stack frame of the executing method (e.g. `main`).
+   - `t1` occupies 4 or 8 bytes (depending on JVM Compressed OOPs) and holds the memory address reference of the object on the heap.
+
+2. Java Heap (Shared Object Space):
+   - The `new` keyword triggers dynamic heap memory allocation.
+   - Object Header (12 or 16 bytes: Mark Word + Klass Word pointer).
+   - Primitive Fields stored inline:
+     * `ticketId` (int, 4 bytes)
+     * `floor` (int, 4 bytes)
+     * `slot` (int, 4 bytes)
+     * `entryTime` (long, 8 bytes)
+     * `exitTime` (long, 8 bytes)
+     * `fee` (double, 8 bytes)
+     * `isPaid` (boolean, 1 byte + alignment padding)
+   - Reference Field `vehicleNo`: Holds a 4/8-byte reference pointing to the String object located in the Heap String Constant Pool.
+
+Memory Diagram:
+  STACK FRAME (main)                          HEAP MEMORY
+ +-------------------+                    +-------------------------------+
+ |  t1 (Reference)   | -----------------> | ParkingTicket Instance        |
+ +-------------------+                    | - ticketId: 101               |
+                                          | - vehicleNo: Reference ------> [ "TN01AB1111" in String Pool ]
+                                          | - floor: 0, slot: 1           |
+                                          | - entryTime: 1718900000000L   |
+                                          | - fee: 0.0, isPaid: false     |
+                                          +-------------------------------+
+
+================================================================================
+6. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+================================================================================
+
+Comparison of Object Creation Patterns:
+
+Pattern 1: Parameterized Constructors with Constructor Chaining (Chosen)
+- Pattern:
+  `ParkingTicket t = new ParkingTicket(101, "TN01AB1111", 0, 1);`
+- Invariant & Validity Guarantee:
+  Guaranteed. The object cannot be constructed without satisfying required parameters. Fields can be made `final` to guarantee immutability.
+- Time Complexity: O(1) per object; n objects require O(n) construction time.
+- Space Overhead: Minimum heap footprint (single object header + fields).
+
+Pattern 2: Default Constructor Followed by Setter Calls (JavaBeans Pattern)
+- Pattern:
+  `ParkingTicket t = new ParkingTicket();`
+  `t.setTicketId(101);`
+  `t.setVehicleNo("TN01AB1111");`
+  `t.setFloor(0);`
+- Invariant & Validity Guarantee:
+  Extremely weak. The object exists in a partially initialized, inconsistent state between the constructor and subsequent setter calls. If an exception occurs or the programmer forgets to call `setVehicleNo()`, invalid objects leak into the system.
+- Time Complexity: O(1) per object, but requires multiple method call stack pushes. Creating n objects requires O(n) calls with higher invocation overhead.
+- Space Overhead: Fields cannot be made `final`, precluding certain JVM compiler optimizations.
+
+Pattern 3: Static Factory Methods
+- Pattern:
+  `ParkingTicket t = ParkingTicket.issueTicket("TN01AB1111", 0, 1);`
+  `ParkingTicket dup = ParkingTicket.reissueDuplicate(originalTicket);`
+- Invariant & Validity Guarantee:
+  Excellent. Enforces validation before construction; names clearly communicate business intent (`issueTicket` vs `reissueDuplicate`).
+- Time Complexity: O(1) per object; n objects require O(n) construction time.
+- Space Overhead: Identical to constructors, with potential savings if caching reusable objects.
+
+Summary Comparison:
+--------------------------------------------------------------------------------
+Criteria            Constructor Chaining    Default + Setters       Static Factory Methods
+--------------------------------------------------------------------------------
+Guaranteed Validity High (Immediate)        Low (Temporally fragile)High (Pre-validated)
+Immutability        Fully supported (final) Not supported           Fully supported
+Readability         Clear signatures        Verbose                 Expressive method names
+Time to create n    O(n)                    O(n) (higher overhead)  O(n)
+Memory per object   Base heap size          Base heap size          Base heap size
+--------------------------------------------------------------------------------
+
+================================================================================
+7. EVIDENCE EXPECTED
+================================================================================
+Class definitions featuring default, parameterized, overloaded, and copy constructors with constructor chaining via `this`, supported by a detailed stack/heap memory explanation and object validity analysis.

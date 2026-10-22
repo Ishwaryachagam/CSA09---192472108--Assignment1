@@ -1,0 +1,130 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 7: OVERRIDE AND SPECIALISE BEHAVIOUR
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To identify domain behaviors that vary across subclasses, implement specialized logic using Java method overriding with the `@Override` annotation, analyse the architectural impacts of evolving facility requirements, and evaluate the trade-offs between extending classes versus modifying existing code.
+
+================================================================================
+2. SPECIALIZING BEHAVIOUR VIA METHOD OVERRIDING
+================================================================================
+
+A. Domain Behaviours that Differ Across Subclasses:
+--------------------------------------------------
+In the Campus Smart-Parking System, vehicles cannot be treated as homogeneous entities:
+1. Fee Calculation (`computeFee(long hours)`):
+   - TwoWheeler: Minimal footprint, low energy impact -> Discounted flat rate of ₹10.00/hour.
+   - Car: Standard space consumption -> Baseline campus rate of ₹20.00/hour.
+   - ElectricCar: Standard space + electricity draw -> Base car fee (₹20.00/hour) plus active charging surcharge (₹15.00/hour).
+2. Slot Compatibility (`requiresChargingSlot()` & `isCompatibleSlot(ParkingSlot slot)`):
+   - TwoWheeler and standard Car can park in standard parking bays.
+   - ElectricCar requiring charging must be steered exclusively to EV-enabled charging slots equipped with supply points.
+3. String Representation (`toString()` / `display()`):
+   - Each subclass presents domain-specific metadata (helmet storage for bikes, battery capacity and charging status for EVs).
+
+B. The `@Override` Annotation and Overriding Rules in Java:
+----------------------------------------------------------
+The `@Override` annotation instructs the Java compiler to verify that the annotated method actually overrides a declaration in a superclass:
+1. Exact Signature Match: The method name, parameter count, parameter types, and order must match the parent method exactly. If a programmer accidentally writes `computeFee(int hours)` instead of `computeFee(long hours)`, the compiler raises an immediate error rather than silently treating it as an overloaded method.
+2. Covariant Return Types: Overridden methods may return a narrower subtype of the superclass return type.
+3. Access Restrictions: An overriding method cannot have a more restrictive access modifier than the superclass method (e.g., a `public` superclass method cannot be overridden as `protected` or `private`).
+4. Non-Overridable Elements: Methods declared as `private`, `static`, or `final` cannot be overridden.
+
+================================================================================
+3. WHAT HAS CHANGED FROM THE ORIGINAL PROBLEM
+================================================================================
+The baseline parking problem assumed a simple, uniform structure:
+- Homogeneous vehicles (generic cars with a single uniform hourly rate).
+- Uniform floors with identical slot counts.
+- Basic entry/exit timing.
+
+The Expanded / Evolved Campus Requirements Introduce:
+1. Multi-Category Vehicles: Two-wheelers, conventional cars, and electric vehicles.
+2. Separate Charging Tariffs: EVs can use charging facilities billed as an additional component.
+3. Monthly Passes: Campus staff and students holding valid passes must be recognized and charged ₹0.00, whereas non-pass holders pay full fees.
+4. Heterogeneous Facility Topologies: Floors are no longer uniform rectangles. Floor 0 (Ground) may have 20 premium/EV charging slots, Floor 1 may have 50 standard slots, and Floor 2 may have 100 mixed slots.
+
+================================================================================
+4. AFFECTED CLASSES, METHODS, AND DATA STRUCTURES
+================================================================================
+1. Classes Affected:
+   - `Vehicle`: Must become the root of polymorphic behavior, providing abstract or overridable definitions of `computeFee()` and `requiresChargingSlot()`.
+   - `ParkingSlot`: Must track capability metadata (`isChargingSlot`, `slotType`) rather than merely a vehicle string.
+   - `ParkingFacility`: Allocation logic must change from blindly searching for the first null slot to matching the vehicle's specific requirement with the slot's capability.
+2. Methods Affected:
+   - `allocate(Vehicle v)`: Must verify `slot.isAvailable() && (!v.requiresChargingSlot() || slot.isChargingSlot())`.
+   - `computeFee(Vehicle v, long hours, boolean hasPass)`: Must query the vehicle's specialized computation method rather than hardcoding tariffs.
+3. Data Structures Affected:
+   - `slots[][]`: Must be structured as a jagged array `ParkingSlot[floors][]` where each floor array reflects its true physical capacity.
+
+================================================================================
+5. WHY A DIFFERENT NUMBER OF SLOTS PER FLOOR AFFECTS ARRAY DESIGN
+================================================================================
+If Floor 0 has 20 slots, Floor 1 has 50 slots, and Floor 2 has 100 slots:
+- A rectangular 2D array `ParkingSlot[3][100]` forces the system to allocate 300 references.
+  * For Floor 0, indices 20 through 99 are physically non-existent.
+  * If the allocation loop iterates over `slots[f].length`, it will attempt to park vehicles in non-existent spaces, leading to physical collisions, lost cars, and phantom availability reports.
+  * Attempting to guard with boundary checks introduces clutter and bugs.
+- A Jagged Array `ParkingSlot[3][]` instantiates `slots[0] = new ParkingSlot[20];`, `slots[1] = new ParkingSlot[50];`, `slots[2] = new ParkingSlot[100];`.
+  * `slots[f].length` precisely mirrors the real-world boundary of each floor.
+  * Iterating loops naturally terminate at physical boundaries without dummy sentinels.
+  * Memory is strictly optimal at O(sum(S_i)).
+
+================================================================================
+6. CLASSES MODIFIED VERSUS EXTENDED (OPEN-CLOSED PRINCIPLE)
+================================================================================
+The Open-Closed Principle (OCP) states that software entities should be open for extension, but closed for modification.
+
+A. Classes Extended:
+- `Vehicle`: Extended by `TwoWheeler`, `Car`, `ElectricCar`.
+- When new vehicles are introduced (e.g. `Bus`, `Ambulance`), zero changes are made to `Vehicle`, `Car`, or `TwoWheeler`. We simply write a new subclass.
+
+B. Classes That Had to Be Modified Initially:
+- If `ParkingFacility` was originally written with hardcoded `String[][] slots` and checked `if (vehicleType.equals("Car"))`:
+  * It had to be refactored to hold `ParkingSlot[][]` or abstract `Vehicle` references.
+  * However, once refactored to work against the base `Vehicle` and `ParkingSlot` abstractions, `ParkingFacility` becomes permanently closed for modification and open for future vehicle extensions!
+
+================================================================================
+7. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+================================================================================
+Comparison: Method Overriding (Polymorphism) vs Monolithic `switch` in Superclass.
+
+Approach 1: Monolithic `switch` Statement in Superclass
+  public double computeFee(String type, long hours) {
+      switch (type) {
+          case "TwoWheeler": return hours * 10.0;
+          case "Car": return hours * 20.0;
+          case "ElectricCar": return hours * 35.0;
+          default: return hours * 20.0;
+      }
+  }
+- Flaws:
+  1. Violates Open-Closed Principle: Every time a new vehicle (e.g., Bus, ElectricScooter) is introduced, the superclass must be reopened and modified.
+  2. High Risk of Regression: Editing core base classes risks breaking already-tested legacy vehicle calculations.
+  3. Scattering: If another method needs type-specific behavior (e.g., `requiresChargingSlot()`), another duplicate switch statement must be maintained.
+- Time Complexity: O(k) branching comparisons where k is the number of vehicle types.
+
+Approach 2: Method Overriding (Dynamic Method Dispatch - Chosen)
+- Each subclass overrides `computeFee(long hours)` and encapsulates its own pricing rules.
+- Invocation: `v.computeFee(hours)` dynamically resolves at runtime via the JVM Virtual Method Table (vtable).
+- Extensibility: Adding a new vehicle requires zero modifications to existing classes.
+- Time Complexity: O(1) single-level indirect table lookup.
+
+Comparison Summary:
+--------------------------------------------------------------------------------
+Criteria            Method Overriding (Dynamic Dispatch)Monolithic switch Statement
+--------------------------------------------------------------------------------
+Extensibility (OCP) Completely Open for Extension       Violates OCP (Must modify parent)
+Coupling            Loose (Each subclass encapsulated)  Tight (Parent knows all children)
+Maintenance OverheadLow (Zero ripple effect)            High (Multiple switch updates)
+Time Complexity     O(1) (Direct vtable jump)           O(k) (Sequential/hash branching)
+Memory Overhead     O(1) vtable pointer per class       Zero extra pointer
+--------------------------------------------------------------------------------
+
+================================================================================
+8. EVIDENCE EXPECTED
+================================================================================
+A clear, technically justified analysis of specialized subclass behavior, the safety of `@Override`, the necessity of jagged arrays for non-uniform floors, and a quantitative comparison between dynamic method dispatch and procedural switch-case logic.

@@ -1,0 +1,100 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 8: POLYMORPHISM
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To design, implement, and evaluate compile-time polymorphism (method overloading) and runtime polymorphism (dynamic method dispatch), demonstrate type-safe downcasting using the `instanceof` operator, and analyse the performance and maintainability differences between polymorphic dispatch and procedural type-tag conditioning.
+
+================================================================================
+2. COMPILE-TIME VS RUNTIME POLYMORPHISM
+================================================================================
+
+A. Compile-Time Polymorphism (Static Binding / Method Overloading):
+------------------------------------------------------------------
+- Definition: Multiple methods in the same class share the exact same method name but possess distinct parameter lists (differing in argument count, argument data types, or argument order).
+- Binding Time: The Java compiler resolves which overloaded method to invoke during compilation based on the static types of arguments passed.
+- Examples in Campus Parking System:
+  1. `calculateFee(long hours)`: Basic hourly fee calculation.
+  2. `calculateFee(long hours, double discountPercentage)`: Overloaded method allowing promotional/campus event discounts.
+  3. `allocate(Vehicle v)`: Standard automatic allocation of first available compatible slot.
+  4. `allocate(Vehicle v, int preferredFloor)`: Overloaded method allowing priority parking on a specific floor (e.g., ground floor for disabled visitors or VIPs).
+
+B. Runtime Polymorphism (Dynamic Binding / Method Overriding):
+-------------------------------------------------------------
+- Definition: A superclass reference variable refers to a subclass object. When an overridden method is called on the superclass reference, the JVM determines at runtime which subclass implementation to execute based on the actual object instance present on the heap.
+- Binding Time: Late / dynamic binding at runtime using the JVM's Virtual Method Table (vtable).
+- Example:
+  `Vehicle v = new ElectricCar("TN01EV1111", "MG", true);`
+  `v.computeFee(3);` // Dynamically executes ElectricCar's computeFee, calculating base fee + EV charging surcharge!
+
+================================================================================
+3. UPCASTING, DOWNCASTING AND TYPE SAFETY WITH `instanceof`
+================================================================================
+
+A. Upcasting (Widening):
+-----------------------
+- Assigning a subclass object to a superclass reference variable:
+  `Vehicle v = new ElectricCar("TN01EV9999", "Tata", true);`
+- Always 100% safe and implicit because every `ElectricCar` is guaranteed to be a `Vehicle`.
+- Encapsulates caller logic, allowing the parking facility to treat all vehicles uniformly without knowing their specific concrete classes.
+
+B. Downcasting (Narrowing):
+--------------------------
+- Converting a superclass reference back to its specialized subclass type:
+  `ElectricCar ec = (ElectricCar) v;`
+- Required when accessing subclass-specific methods that do not exist on the generic `Vehicle` superclass (e.g., `ec.getBatteryLevel()`, `ec.plugInCharger()`).
+
+C. Type Safety and `instanceof`:
+--------------------------------
+- Unchecked Downcasting Risk:
+  If a reference actually points to a `TwoWheeler`, attempting `ElectricCar ec = (ElectricCar) v;` will throw a runtime `java.lang.ClassCastException`, crashing the parking booth application.
+- Defensive Safe Downcasting:
+  Guarding with `instanceof`:
+  `if (v instanceof ElectricCar) {`
+  `    ElectricCar ec = (ElectricCar) v;`
+  `    ec.plugInCharger();`
+  `}`
+- Java 16+ Pattern Matching for `instanceof`:
+  `if (v instanceof ElectricCar ec) { ec.plugInCharger(); }` seamlessly tests the type and binds the scoped variable in a single atomic expression.
+
+================================================================================
+4. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+================================================================================
+
+Approach A: Runtime Polymorphism with Dynamic Dispatch (Chosen)
+- Superclass `Vehicle` defines `abstract double computeFee(long hours)`.
+- Each subclass (`TwoWheeler`, `Car`, `ElectricCar`, `Bus`) overrides the method.
+- Dispatch logic: `v.computeFee(hours)`.
+- Extensibility: Adding a 10th vehicle category (e.g. `Ambulance`) requires simply writing the new class. Zero existing lines of code are modified.
+- Execution Time: O(1) constant time virtual table lookup.
+
+Approach B: Procedural Type Codes and Conditional Ladders
+- Vehicles store an enum or integer type tag: `v.getTypeCode()`.
+- Billing logic is implemented as a giant switch or if-else ladder:
+  `if (v.getType() == VehicleType.TWO_WHEELER) { ... }`
+  `else if (v.getType() == VehicleType.CAR) { ... }`
+  `else if (v.getType() == VehicleType.ELECTRIC_CAR) { ... }`
+- Flaws:
+  1. High Maintenance Overhead: Type code checking becomes duplicated across allocation, billing, slot sizing, receipt formatting, and reports.
+  2. Severe Bug Risk: Forgetting to update one branch when a new type is introduced causes silent failures or default fallbacks.
+  3. Violates Open-Closed Principle and high cyclomatic complexity.
+- Execution Time: O(k) branching evaluation where k is the number of types.
+
+Comparison Table:
+--------------------------------------------------------------------------------
+Criteria            Runtime Polymorphism        Type Code / Conditional Ladder
+--------------------------------------------------------------------------------
+Architecture        Object-Oriented (Dynamic)   Procedural (Conditional)
+Open-Closed (OCP)   Strictly Adhered            Violated (Continuous modifications)
+Type Safety         Compile-time checked        Runtime branch dependent
+Code Scattering     Zero (Encapsulated in class)High (Scattered across codebase)
+Time Complexity     O(1) (Direct vtable jump)   O(k) (Sequential comparisons)
+--------------------------------------------------------------------------------
+
+================================================================================
+5. EVIDENCE EXPECTED
+================================================================================
+A justified implementation of method overloading (compile-time) and method overriding (runtime) with heterogeneous array processing, guarded downcasting demonstrating `instanceof`, and complexity analysis comparing polymorphic dispatch against procedural branching.

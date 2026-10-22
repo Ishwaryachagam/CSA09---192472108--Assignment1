@@ -1,0 +1,134 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 10: PACKAGES AND ENCAPSULATION
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To organize the Campus Smart-Parking System into a modular package architecture, enforce strict data encapsulation using access modifiers (`private`, `default`, `protected`, `public`), protect internal state invariants through defensive copying and immutability, and analyse the trade-offs between public fields and encapsulated accessors.
+
+================================================================================
+2. PACKAGE ARCHITECTURE AND SEPARATION OF CONCERNS
+================================================================================
+A monolithic single-namespace codebase becomes difficult to maintain, test, and secure as an application scales. In Java, packages partition the namespace into cohesive, decoupled subsystems:
+
+Recommended Architecture:
+1. `com.campus.parking.model`:
+   - Contains pure domain entities representing physical and conceptual entities:
+     * `Vehicle` (abstract base)
+     * `TwoWheeler`, `Car`, `ElectricCar`
+     * `ParkingSlot`
+     * `ParkingTicket`
+   - Invariant: Classes in `model` know nothing about database, UI, or facility allocation algorithms.
+
+2. `com.campus.parking.service`:
+   - Contains business management services:
+     * `ParkingFacility`
+     * `SlotAllocationPolicy`
+   - Invariant: Manages state transitions, slot occupation, and release workflows.
+
+3. `com.campus.parking.billing`:
+   - Contains tariff rules and financial calculation logic:
+     * `BillingCalculator`
+     * `TariffPlan`
+     * `Receipt`
+
+4. `com.campus.parking.app`:
+   - Application entry point:
+     * `SmartParkingApp` (CLI/GUI orchestrator)
+
+================================================================================
+3. ENCAPSULATION AND ACCESS MODIFIER MATRIX
+================================================================================
+Encapsulation bundles data attributes and operating methods within a single class while concealing internal implementation details from external interference.
+
+Java Access Modifiers in Campus Smart-Parking:
+--------------------------------------------------------------------------------
+Modifier        Visibility Level        Applied to in Parking System
+--------------------------------------------------------------------------------
+private         Class only              `slots[][]`, `ticketId`, `isOccupied`, `fee`
+default (none)  Package-private         Internal helper methods (e.g., `validateInternalSlot()`)
+protected       Package + Subclasses    `baseRatePerHour`, `brand` (accessible to `Car`, `TwoWheeler`)
+public          World (All packages)    Public API (`allocate()`, `release()`, `calculateBill()`)
+--------------------------------------------------------------------------------
+
+Why `private final String[][] slots;` is Mandatory:
+- If `slots` were `public`, any external client or rogue thread could execute:
+  `p.slots[0][0] = "ROGUE_CAR";`
+  bypassing all capacity validations, audit logs, and ticket counter increments.
+- Marking `slots` private ensures state mutation occurs strictly through validated methods (`allocate()`, `release()`).
+
+================================================================================
+4. DEFENSIVE PROGRAMMING AND DEFENSIVE COPYING
+================================================================================
+
+A. Defensive Validation in Mutators (Setters):
+- Rather than blindly accepting input, setters and methods validate preconditions:
+  ```java
+  public void setVehicleNo(String vehicleNo) {
+      if (vehicleNo == null || vehicleNo.trim().isEmpty()) {
+          throw new IllegalArgumentException("Vehicle registration number cannot be null or empty.");
+      }
+      this.vehicleNo = vehicleNo.trim().toUpperCase();
+  }
+  ```
+
+B. Defensive Copying for Array References:
+- In Java, returning an array directly exposes its internal mutable reference:
+  `public String[][] getSlots() { return this.slots; } // DANGEROUS!`
+  An external caller could mutate the array contents: `facility.getSlots()[0][0] = null;`
+- Solution (Defensive Deep Copy):
+  ```java
+  public String[][] getSlotsSnapshot() {
+      String[][] copy = new String[slots.length][];
+      for (int i = 0; i < slots.length; i++) {
+          copy[i] = java.util.Arrays.copyOf(slots[i], slots[i].length);
+      }
+      return copy;
+  }
+  ```
+  Now external callers receive an isolated snapshot without altering internal facility state.
+
+C. Immutability via `final`:
+- Ticket identifiers, arrival timestamps, and vehicle registration plates should be `final` because once a vehicle enters, its physical identity and arrival time cannot change.
+
+================================================================================
+5. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+================================================================================
+
+Comparison: Encapsulated Fields with Accessors vs Public Fields
+
+Approach A: Public Fields (Unencapsulated Struct Pattern)
+  `public class ParkingTicket { public int id; public String vehicleNo; public double fee; }`
+- Advantages: Zero getter/setter boilerplate code; negligible micro-overhead.
+- Severe Flaws:
+  1. Loss of Invariants: Any external code can assign invalid data (`ticket.id = -999; ticket.fee = -500.0;`).
+  2. Impossibility of Refactoring: If the internal representation changes (e.g. converting `fee` from double to `BigDecimal` or converting duration to minutes), all external client code referencing the field directly breaks.
+  3. No Concurrency Protection: Cannot synchronize or log mutations.
+
+Approach B: Strict Encapsulation with Getters and Setters (Chosen)
+  `private double fee; public double getFee() { return fee; } public void setFee(double fee) { ... }`
+- Advantages:
+  1. Precondition Checking: Guaranteed state validity.
+  2. Immutability: Omitting setters creates read-only objects.
+  3. JVM Optimization: Modern JVM Just-In-Time (JIT) compilers automatically inline simple getter/setter calls, eliminating method invocation overhead completely at runtime!
+- Performance Comparison:
+  Runtime execution time is IDENTICAL due to JIT method inlining (0 ns difference).
+  Memory usage is IDENTICAL (same heap memory layout).
+
+Comparison Summary Table:
+--------------------------------------------------------------------------------
+Criteria            Strict Encapsulation (Getters/Setters)  Public Fields
+--------------------------------------------------------------------------------
+State Validation    Enforced (Preconditions guarded)        Impossible (Unrestricted mutation)
+Refactoring Ease    High (Internal fields can change)       Extremely Poor (Breaks all callers)
+Immutability        Easily achieved (omit setters)          Impossible
+Security & Audit    Can log/audit state mutations           Invisible direct tampering
+JIT Compiled Speed  O(1) (Inlined to direct memory access)  O(1) (Direct memory access)
+--------------------------------------------------------------------------------
+
+================================================================================
+6. EVIDENCE EXPECTED
+================================================================================
+A justified package organization strategy, access modifier security matrix, defensive copying implementation to safeguard internal array structures, and analysis proving JIT-inlined zero-cost encapsulation.

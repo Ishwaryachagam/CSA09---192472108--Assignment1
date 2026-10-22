@@ -1,0 +1,126 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 9: ABSTRACTION
+Bloom's Level: K4 - Analyse
+
+================================================================================
+1. AIM
+================================================================================
+To design, implement, and evaluate abstraction in the Campus Smart-Parking System using abstract classes and interfaces, demonstrate partial versus pure abstraction, exploit multiple interface inheritance for charging capabilities, and analyse architectural trade-offs among abstract classes, interfaces, and concrete base classes.
+
+================================================================================
+2. ABSTRACT CLASSES VS INTERFACES IN OBJECT-ORIENTED DESIGN
+================================================================================
+
+A. The Need for Abstraction:
+----------------------------
+Abstraction focuses on *what* an object does rather than *how* it does it. It hides low-level internal complexities and exposes only high-level conceptual operations to the system.
+In the parking domain:
+- A generic "Vehicle" cannot exist by itself in the physical world; every vehicle on the road is a concrete manifestation (a motorcycle, a sedan, an EV).
+- Instantiating `new Vehicle("TN01", "Generic")` is logically meaningless because a generic vehicle has no measurable dimensions, no defined parking slot requirement, and no pricing rule.
+- Declaring `abstract class Vehicle` prevents invalid instantiation at compile time while providing a unified supertype for polymorphic dispatch.
+
+B. Abstract Classes (Partial Abstraction):
+----------------------------------------
+- An abstract class is a blueprint that cannot be directly instantiated with `new`.
+- Key Capabilities:
+  1. Can maintain instance state (fields like `regNo`, `brand`, `entryTimeMillis`).
+  2. Can contain constructors invoked by subclasses via `super(...)`.
+  3. Combines concrete implementation (shared helper methods like `getRegNo()`, `recordEntry()`) with abstract methods (`abstract double getHourlyRate()`) that enforce subclass compliance.
+
+C. Interfaces (Pure Contractual Abstraction):
+--------------------------------------------
+- An interface is a formal specification of capabilities. It represents an "acts-as" or "can-do" relationship rather than a strict hierarchical taxonomy ("is-a").
+- Key Capabilities:
+  1. Contains method signatures representing behavioral contracts (`void connectCharger()`, `double getPowerConsumedKWh()`).
+  2. Solves the Multiple Inheritance Problem: Java disallows multiple class inheritance (`extends ClassA, ClassB`) to avoid the diamond problem, but allows a class to implement any number of interfaces (`implements Chargeable, Billable`).
+  3. Completely decoupled from class hierarchy: A charging station could charge an `ElectricCar`, an `ElectricBus`, or even a campus maintenance `GolfCart`, all adhering to the `Chargeable` contract.
+
+================================================================================
+3. INTERFACE CONTRACTS IN CAMPUS SMART-PARKING
+================================================================================
+
+1. Interface `Chargeable`:
+   ```java
+   public interface Chargeable {
+       void connectCharger();
+       void disconnectCharger();
+       boolean isCharging();
+       double getPowerUnitsConsumed();
+       double getChargingTariff();
+   }
+   ```
+   Implemented by: `ElectricCar`, `ElectricScooter`, `ElectricBus`.
+
+2. Interface `PassHolder`:
+   ```java
+   public interface PassHolder {
+       String getPassId();
+       boolean isPassValid();
+       String getUserCategory(); // "STUDENT", "STAFF"
+   }
+   ```
+
+3. Abstract Class `Vehicle`:
+   ```java
+   public abstract class Vehicle {
+       protected final String regNo;
+       protected final String brand;
+       protected final long entryTimestamp;
+
+       public Vehicle(String regNo, String brand) {
+           this.regNo = regNo;
+           this.brand = brand;
+           this.entryTimestamp = System.currentTimeMillis();
+       }
+
+       // Concrete shared methods
+       public String getRegNo() { return regNo; }
+       public long getEntryTimestamp() { return entryTimestamp; }
+
+       // Abstract contracts enforced on all concrete subclasses
+       public abstract double getHourlyRate();
+       public abstract String getRequiredSlotCategory();
+   }
+   ```
+
+================================================================================
+4. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+================================================================================
+
+Comparison: Abstract Class vs Interface vs Concrete Base Class
+
+Approach 1: Concrete Base Class with Default Methods
+- Make `Vehicle` a non-abstract concrete class with dummy implementations:
+  `public double getHourlyRate() { return 0.0; }`
+- Flaws:
+  1. Dangerous: Nothing prevents a developer from accidentally instantiating a dummy vehicle: `new Vehicle("TN01", "Generic")`.
+  2. Silent Runtime Failures: If a newly created subclass forgets to override `getHourlyRate()`, it silently defaults to ₹0.00, parking for free and bankrupting the parking department! The compiler provides zero warnings.
+
+Approach 2: Pure Interface Architecture (`interface Vehicle`)
+- Make `Vehicle` a pure interface with no fields.
+- Flaws:
+  Forces every single subclass (`TwoWheeler`, `Car`, `Bus`, `Truck`) to redundantly re-declare the exact same fields (`regNo`, `brand`, `entryTimestamp`) and duplicate standard getter code, completely violating the DRY (Don't Repeat Yourself) principle.
+
+Approach 3: Hybrid Architecture (Abstract Base Class + Specialized Interfaces - Chosen)
+- `Vehicle` is an `abstract class` capturing all common state and boilerplates.
+- Subclasses implement specific behavioral contracts like `Chargeable`.
+- Compiler Enforces Compliance: If a subclass fails to implement `getHourlyRate()`, the code fails to compile immediately.
+
+Comparison Summary:
+--------------------------------------------------------------------------------
+Criteria            Abstract Class              Interface                   Concrete Base Class
+--------------------------------------------------------------------------------
+Can instantiate?    No (Safe)                   No (Safe)                   Yes (Unsafe dummy objects)
+State & Fields      Full instance fields        public static final only    Full instance fields
+Constructor         Yes (Invoked via super)     No                          Yes
+Multiple per class? No (Single inheritance)     Yes (Multiple interfaces)   No (Single inheritance)
+Subclass Compliance Enforced at compile time    Enforced at compile time    Voluntary (Silent bug risk)
+Heap Memory/Object  Single contiguous object    Single contiguous object    Single contiguous object
+Dispatch Speed      O(1) (Virtual Table)        O(1) (Interface Table itable)O(1) (Virtual Table)
+--------------------------------------------------------------------------------
+
+================================================================================
+5. EVIDENCE EXPECTED
+================================================================================
+A justified implementation of data abstraction featuring `abstract class Vehicle` and `interface Chargeable`, demonstrating compile-time prevention of generic vehicle instantiation, multi-interface capability, and trade-off analysis.

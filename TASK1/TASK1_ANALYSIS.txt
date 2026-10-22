@@ -1,0 +1,107 @@
+CSA09 – JAVA ASSIGNMENT 1
+
+TASK 1: UNDERSTAND THE PROBLEM AND IDENTIFY THE OBJECTS
+
+**1. Aim**
+
+To analyse the Campus Smart-Parking System and identify the classes, objects, inputs, outputs and business rules required to implement it using Java.
+
+**2. Problem Statement**
+
+The Campus Smart-Parking System manages parking spaces for students, staff and visitors. It allocates suitable parking slots to vehicles, generates parking tickets, records entry and exit times, calculates parking fees and releases slots when vehicles leave.
+
+**3. Inputs**
+
+- Vehicle registration number
+- Vehicle type
+- Number of floors and parking slots
+- Entry and exit times
+- User category and parking pass validity
+
+**4. Outputs**
+
+- Allocated floor and slot number
+- Unique parking ticket
+- Parking availability status
+- Parking duration
+- Final parking fee
+
+**5. Candidate Classes and Responsibilities**
+
+- Vehicle: Stores vehicle details.
+- Car: Represents a car.
+- TwoWheeler: Represents a two-wheeler.
+- ElectricCar: Represents an electric vehicle.
+- ParkingSlot: Stores slot details and occupancy status.
+- ParkingTicket: Stores ticket number and entry information.
+- ParkingFacility: Manages parking slots and allocation.
+- ParkingPass: Stores pass details and validity.
+- PricingRule: Calculates parking fees.
+
+**6. Business Rules**
+
+1. A parking slot can contain only one vehicle at a time.
+2. Each parking ticket must have a unique number.
+3. Only suitable free slots can be allocated.
+4. Invalid or already-free slots cannot be released.
+5. Valid student and staff monthly passes allow free parking.
+6. Visitors must pay the applicable parking fee.
+7. Electric vehicles must use compatible charging slots when charging is required.
+8. The parking fee depends on the vehicle type and parking duration.
+
+**7. Assumptions**
+
+- Each vehicle has a unique registration number.
+- The number of floors and slots is known.
+- Entry and exit times are recorded correctly.
+- Parking rates can be configured for different vehicle types.
+- Pass validity is checked before applying free parking.
+
+**8. Conclusion**
+
+The system can be organised using separate Java classes for vehicles, parking slots, tickets, parking facilities, parking passes and pricing rules. This object-oriented design makes the system easier to maintain and extend.
+9. ALTERNATIVE CONCEPT AND COMPLEXITY ANALYSIS
+
+A. Using Vehicle Objects
+
+In this approach, each vehicle is represented as an object containing its registration number, vehicle type and entry time.
+
+Example:
+
+Vehicle v1 = new Vehicle("TN01AB1111", "Car", 1000);
+
+Here, the Vehicle object stores all related information together.
+
+B. Using Parallel Arrays
+
+In this approach, separate arrays store the details of each vehicle.
+
+Example:
+
+String[] regNo = new String[100];
+String[] type = new String[100];
+long[] entryTime = new long[100];
+
+The information belonging to one vehicle is stored at the same index in all arrays.
+
+C. Comparison
+
+1. Searching for a vehicle
+
+Both approaches take O(n) time for a linear search, where n is the number of vehicles.
+
+2. Adding a new attribute
+
+In the object-oriented approach, a new field can be added to the Vehicle class.
+
+In the parallel-array approach, another array must be created and maintained, using matching indices.
+
+3. Space complexity
+
+Both approaches require O(n) total space for n vehicles when the number of attributes is fixed.
+
+Parallel arrays require three arrays for the three attributes shown. Objects group the attributes into individual Vehicle objects, with additional memory overhead for objects and references.
+
+D. Conclusion
+
+The object-oriented approach is preferred because it groups related information together, is easier to maintain and supports inheritance and polymorphism when new vehicle types are introduced.
