@@ -1,1 +1,3 @@
-﻿*.class
+*.class
+run_all.bat
+run_all.ps1
